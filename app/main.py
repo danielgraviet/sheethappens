@@ -1,4 +1,5 @@
 import logging
+import time
 
 import redis
 from fastapi import FastAPI
@@ -35,6 +36,7 @@ def health() -> dict:
 
 @app.get("/sync", response_model=SyncResult)
 def sync() -> SyncResult:
+    started_at = time.monotonic()
     logger.info("Sync started.")
 
     # --- bootstrap clients ---
@@ -44,8 +46,8 @@ def sync() -> SyncResult:
         sheets = SheetsClient()
         redis_client = redis.from_url(settings.redis_url, decode_responses=True)
         idempotency = IdempotencyService(redis_client)
-    except (SheetsAuthError, Exception) as exc:
-        logger.error("Failed to initialise clients: %s", exc)
+    except Exception as exc:
+        logger.error("ALERT: Failed to initialise clients: %s", exc)
         return SyncResult(
             status="error",
             total_fetched=0,
@@ -57,8 +59,17 @@ def sync() -> SyncResult:
     # --- fetch & adapt ---
     try:
         raw = canvas.fetch_upcoming_assignments()
-    except (CanvasAuthError, CanvasAPIError) as exc:
-        logger.error("Canvas fetch failed: %s", exc)
+    except CanvasAuthError as exc:
+        logger.error("ALERT: Canvas auth failure — token may need rotating: %s", exc)
+        return SyncResult(
+            status="error",
+            total_fetched=0,
+            skipped_duplicates=0,
+            newly_inserted=0,
+            failures=1,
+        )
+    except CanvasAPIError as exc:
+        logger.error("ALERT: Canvas API unreachable — repeated failures may indicate upstream outage: %s", exc)
         return SyncResult(
             status="error",
             total_fetched=0,
@@ -93,9 +104,23 @@ def sync() -> SyncResult:
             logger.error("Unexpected error for assignment %s: %s", assignment.assignment_id, exc)
             failures += 1
 
+    elapsed = time.monotonic() - started_at
+
+    # --- alerting ---
+    if failures > 0 and inserted == 0 and total_fetched > 0:
+        logger.error(
+            "ALERT: Sync completed with zero inserts and %d failure(s) — investigate Sheets or Redis connectivity.",
+            failures,
+        )
+    elif failures > 0:
+        logger.warning(
+            "Sync completed with %d failure(s) — some assignments may not have been written.",
+            failures,
+        )
+
     logger.info(
-        "Sync complete — fetched=%d skipped=%d inserted=%d failures=%d",
-        total_fetched, skipped, inserted, failures,
+        "Sync complete in %.2fs — fetched=%d skipped=%d inserted=%d failures=%d",
+        elapsed, total_fetched, skipped, inserted, failures,
     )
 
     return SyncResult(
