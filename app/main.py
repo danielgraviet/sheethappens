@@ -3,6 +3,16 @@ import logging
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from app.canvas import (
+    AssignmentAdapter,
+    CanvasAPIError,
+    CanvasAuthError,
+    CanvasClient,
+    CanvasMalformedResponseError,
+    CanvasTimeoutError,
+)
+from app.config import settings
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -20,11 +30,29 @@ def health() -> dict:
 
 @app.get("/sync")
 def sync() -> JSONResponse:
-    logger.info("Sync requested (stub)")
+    logger.info("Sync requested")
+    try:
+        with CanvasClient(
+            domain=settings.canvas_domain,
+            token=settings.canvas_token,
+        ) as canvas_client:
+            upcoming_rows = canvas_client.fetch_upcoming_assignments()
+    except CanvasAuthError as exc:
+        logger.exception("Canvas auth error during sync")
+        return JSONResponse(status_code=401, content={"status": "error", "message": str(exc)})
+    except CanvasTimeoutError as exc:
+        logger.exception("Canvas timeout during sync")
+        return JSONResponse(status_code=504, content={"status": "error", "message": str(exc)})
+    except (CanvasMalformedResponseError, CanvasAPIError) as exc:
+        logger.exception("Canvas API error during sync")
+        return JSONResponse(status_code=502, content={"status": "error", "message": str(exc)})
+
+    assignments = [AssignmentAdapter.adapt(row) for row in upcoming_rows]
     return JSONResponse(
-        status_code=501,
+        status_code=200,
         content={
-            "status": "not_implemented",
-            "message": "Sync is not yet implemented.",
+            "status": "ok",
+            "fetched": len(upcoming_rows),
+            "assignments": [assignment.model_dump(mode="json") for assignment in assignments],
         },
     )
