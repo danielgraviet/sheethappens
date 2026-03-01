@@ -1,0 +1,6 @@
+.venv
+.env
+.dmux
+.dmux-hooks
+__pycache__/
+*.pyc
