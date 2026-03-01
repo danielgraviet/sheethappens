@@ -35,10 +35,20 @@ class SheetsClient:
 
     def _build_service(self) -> Any:
         try:
-            creds_dict = json.loads(settings.google_creds_json)
+            creds_value = settings.google_creds_json.strip()
+            # Accept either a file path (e.g. "secret.json") or raw JSON string.
+            if creds_value.endswith(".json") and not creds_value.startswith("{"):
+                with open(creds_value) as f:
+                    creds_dict = json.load(f)
+            else:
+                creds_dict = json.loads(creds_value)
         except (json.JSONDecodeError, ValueError) as exc:
             raise SheetsAuthError(
                 f"GOOGLE_CREDS_JSON is not valid JSON: {exc}"
+            ) from exc
+        except OSError as exc:
+            raise SheetsAuthError(
+                f"Could not read credentials file: {exc}"
             ) from exc
 
         try:

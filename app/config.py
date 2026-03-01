@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     redis_url: str
     google_creds_json: str
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 # Instantiated at import time — fails fast if any required var is missing.

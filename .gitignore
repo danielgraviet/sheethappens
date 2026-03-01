@@ -4,3 +4,5 @@
 .dmux-hooks
 __pycache__/
 *.pyc
+secret.json
+*.json.key
