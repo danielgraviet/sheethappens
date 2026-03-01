@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 TIMEOUT = 10.0
 MAX_RETRIES = 3
 UPCOMING_DAYS = 30
+MAX_PAGES = 20  # safety cap (~1000 planner items max)
 
 
 class CanvasAuthError(Exception):
@@ -35,25 +36,36 @@ class CanvasClient:
     def fetch_upcoming_assignments(self) -> list[dict[str, Any]]:
         """Fetch all upcoming assignment planner items for the current user."""
         now = datetime.now(timezone.utc)
+        # Pass date params only on the first request. Canvas embeds start_date,
+        # end_date, and a bookmark cursor in the rel="next" Link URL, so adding
+        # params again on subsequent pages would duplicate them and reset the cursor.
         params: dict[str, Any] = {
-            "start_date": now.isoformat(),
-            "end_date": (now + timedelta(days=UPCOMING_DAYS)).isoformat(),
+            "start_date": now.date().isoformat(),
+            "end_date": (now + timedelta(days=UPCOMING_DAYS)).date().isoformat(),
             "per_page": 50,
         }
 
         items: list[dict[str, Any]] = []
         url: str | None = f"{self._base_url}/planner/items"
+        page_count = 0
 
-        while url:
+        while url and page_count < MAX_PAGES:
             response = self._get_with_retry(url, params=params)
+            params = None  # subsequent pages use the full Link URL — no extra params
+            page_count += 1
+
             page: list[dict[str, Any]] = response.json()
+            if not page:
+                break
             items.extend(
                 item for item in page if item.get("plannable_type") == "assignment"
             )
             url = self._next_page(response)
-            params = {}  # next URL already contains query params
 
-        logger.info("Fetched %d upcoming assignments from Canvas.", len(items))
+        if page_count >= MAX_PAGES:
+            logger.warning("Canvas pagination hit MAX_PAGES (%d) — results may be incomplete.", MAX_PAGES)
+
+        logger.info("Fetched %d upcoming assignments from Canvas in %d page(s).", len(items), page_count)
         return items
 
     def _get_with_retry(
