@@ -16,7 +16,8 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SHEET_RANGE = "Sheet1!A1"
 
 # Column contract — order must stay stable.
-COLUMNS = ["assignment_id", "course_name", "assignment_name", "due_at", "url", "synced_at"]
+COLUMNS = ["course_name", "assignment_name", "due_at", "url", "assignment_id", "synced_at"]
+HEADERS = ["Course", "Assignment", "Due Date", "Link", "Assignment ID", "Synced At"]
 
 
 class SheetsAuthError(Exception):
@@ -67,7 +68,7 @@ class SheetsClient:
             logger.info("No assignments to write.")
             return 0
 
-        synced_at = datetime.now(timezone.utc).isoformat()
+        synced_at = datetime.now(timezone.utc)
         rows = [self._to_row(a, synced_at) for a in assignments]
 
         if self._dry_run:
@@ -78,6 +79,8 @@ class SheetsClient:
                 rows,
             )
             return len(rows)
+
+        self._ensure_headers()
 
         try:
             self._service.spreadsheets().values().append(
@@ -97,14 +100,54 @@ class SheetsClient:
         logger.info("Appended %d row(s) to spreadsheet %s.", len(rows), self._spreadsheet_id)
         return len(rows)
 
-    @staticmethod
-    def _to_row(assignment: Assignment, synced_at: str) -> list[str]:
+    def _ensure_headers(self) -> None:
+        """Write the header row to A1 if the sheet is empty."""
+        try:
+            result = self._service.spreadsheets().values().get(
+                spreadsheetId=self._spreadsheet_id,
+                range="Sheet1!A1:F1",
+            ).execute()
+            if result.get("values"):
+                return
+            self._service.spreadsheets().values().update(
+                spreadsheetId=self._spreadsheet_id,
+                range="Sheet1!A1",
+                valueInputOption="USER_ENTERED",
+                body={"values": [HEADERS]},
+            ).execute()
+            logger.info("Wrote header row to spreadsheet.")
+        except HttpError as exc:
+            raise SheetsAPIError(f"Failed to write headers: {exc}") from exc
+
+    def _to_row(self, assignment: Assignment, synced_at: datetime) -> list[str]:
         """Serialize an Assignment to a Sheets row following COLUMNS order."""
+        # Human-readable due date
+        if assignment.due_at:
+            dt = assignment.due_at
+            due_str = f"{dt.strftime('%b')} {dt.day}, {dt.year} {dt.strftime('%-I:%M %p')} UTC"
+        else:
+            due_str = ""
+
+        # Full, clickable URL
+        url = assignment.url
+        if url and url.startswith("/"):
+            domain = settings.canvas_domain.rstrip("/")
+            if not domain.startswith("http"):
+                domain = f"https://{domain}"
+            url = f"{domain}{url}"
+        link = f'=HYPERLINK("{url}", "Open →")' if url else ""
+
+        # Human-readable synced timestamp
+        synced_str = (
+            f"{synced_at.strftime('%b')} {synced_at.day}, {synced_at.year} "
+            f"{synced_at.strftime('%-I:%M %p')} UTC"
+        )
+
         return [
-            assignment.assignment_id,
             assignment.course_name,
             assignment.assignment_name,
-            assignment.due_at.isoformat() if assignment.due_at else "",
-            assignment.url,
-            synced_at,
+            due_str,
+            link,
+            assignment.assignment_id,
+            synced_str,
         ]
