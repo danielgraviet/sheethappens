@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 TIMEOUT = 10.0
 MAX_RETRIES = 3
-UPCOMING_DAYS = 30
+DEFAULT_DAYS = 30
+MAX_DAYS = 365
 MAX_PAGES = 20  # safety cap (~1000 planner items max)
 
 
@@ -33,15 +34,20 @@ class CanvasClient:
             "Accept": "application/json",
         }
 
-    def fetch_upcoming_assignments(self) -> list[dict[str, Any]]:
-        """Fetch all upcoming assignment planner items for the current user."""
+    def fetch_upcoming_assignments(self, days: int = DEFAULT_DAYS) -> list[dict[str, Any]]:
+        """Fetch upcoming assignment planner items for the current user.
+
+        Args:
+            days: How many days ahead to fetch (1–365, default 30).
+        """
+        days = max(1, min(days, MAX_DAYS))
         now = datetime.now(timezone.utc)
         # Pass date params only on the first request. Canvas embeds start_date,
         # end_date, and a bookmark cursor in the rel="next" Link URL, so adding
         # params again on subsequent pages would duplicate them and reset the cursor.
         params: dict[str, Any] = {
             "start_date": now.date().isoformat(),
-            "end_date": (now + timedelta(days=UPCOMING_DAYS)).date().isoformat(),
+            "end_date": (now + timedelta(days=days)).date().isoformat(),
             "per_page": 50,
         }
 
@@ -65,7 +71,10 @@ class CanvasClient:
         if page_count >= MAX_PAGES:
             logger.warning("Canvas pagination hit MAX_PAGES (%d) — results may be incomplete.", MAX_PAGES)
 
-        logger.info("Fetched %d upcoming assignments from Canvas in %d page(s).", len(items), page_count)
+        logger.info(
+            "Fetched %d upcoming assignments from Canvas in %d page(s) (window: %d days).",
+            len(items), page_count, days,
+        )
         return items
 
     def _get_with_retry(
