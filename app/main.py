@@ -2,7 +2,7 @@ import logging
 import time
 
 import redis
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 
 from app.adapter import AssignmentAdapter
@@ -35,9 +35,11 @@ def health() -> dict:
 
 
 @app.get("/sync", response_model=SyncResult)
-def sync() -> SyncResult:
+def sync(
+    days: int = Query(default=30, ge=1, le=365, description="How many days ahead to fetch assignments"),
+) -> SyncResult:
     started_at = time.monotonic()
-    logger.info("Sync started.")
+    logger.info("Sync started (window: %d days).", days)
 
     # --- bootstrap clients ---
     try:
@@ -58,7 +60,7 @@ def sync() -> SyncResult:
 
     # --- fetch & adapt ---
     try:
-        raw = canvas.fetch_upcoming_assignments()
+        raw = canvas.fetch_upcoming_assignments(days=days)
     except CanvasAuthError as exc:
         logger.error("ALERT: Canvas auth failure — token may need rotating: %s", exc)
         return SyncResult(
