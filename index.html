@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OhSheet — Canvas assignments, automatically in Google Sheets</title>
+  <meta name="description" content="OhSheet automatically syncs your Canvas LMS assignments into a beautifully formatted Google Sheet — color-coded by urgency, organized by course, with checkboxes to track your progress." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --green-deep:   #1a472a;
+      --green-mid:    #2d6a4f;
+      --green-light:  #52b788;
+      --green-pale:   #d8f3dc;
+      --amber:        #f59e0b;
+      --amber-pale:   #fef3c7;
+      --red:          #ef4444;
+      --red-pale:     #fee2e2;
+      --white:        #ffffff;
+      --off-white:    #f8faf9;
+      --gray-100:     #f3f4f6;
+      --gray-200:     #e5e7eb;
+      --gray-400:     #9ca3af;
+      --gray-600:     #4b5563;
+      --gray-800:     #1f2937;
+      --text-main:    #111827;
+      --text-muted:   #6b7280;
+      --radius-sm:    6px;
+      --radius-md:    12px;
+      --radius-lg:    20px;
+      --radius-xl:    28px;
+      --shadow-sm:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md:    0 4px 16px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+      --shadow-lg:    0 12px 40px rgba(0,0,0,.14), 0 4px 12px rgba(0,0,0,.08);
+      --font-main:    'Plus Jakarta Sans', sans-serif;
+      --font-display: 'Space Grotesk', sans-serif;
+      --max-w:        1100px;
+      --section-gap:  96px;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: var(--font-main);
+      color: var(--text-main);
+      background: var(--white);
+      line-height: 1.6;
+    }
+
+    img { display: block; max-width: 100%; }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* ── Layout helpers ────────────────────────────────────────────── */
+    .container {
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding-inline: 24px;
+    }
+
+    section {
+      padding-block: var(--section-gap);
+    }
+
+    /* ── Buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 100px;
+      font-family: var(--font-main);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+      letter-spacing: -0.01em;
+    }
+
+    .btn-primary {
+      background: var(--green-deep);
+      color: var(--white);
+      box-shadow: 0 4px 20px rgba(26,71,42,.35);
+    }
+
+    .btn-primary:hover {
+      background: var(--green-mid);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(26,71,42,.45);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--green-deep);
+      border: 2px solid var(--green-deep);
+    }
+
+    .btn-outline:hover {
+      background: var(--green-deep);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+
+    /* ── Nav ───────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding: 16px 24px;
+    }
+
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--green-deep);
+      letter-spacing: -0.03em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-logo .logo-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: var(--green-deep);
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    .nav-cta {
+      padding: 10px 22px;
+      font-size: 0.9rem;
+    }
+
+    /* ── Hero ──────────────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      padding-block: 120px 100px;
+      overflow: hidden;
+      background: var(--green-deep);
+    }
+
+    /* Animated gradient background */
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 50%, rgba(82,183,136,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 30%, rgba(45,106,79,0.6) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 50% at 60% 80%, rgba(245,158,11,0.08) 0%, transparent 50%);
+      animation: heroPulse 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes heroPulse {
+      0%   { opacity: 1; transform: scale(1); }
+      100% { opacity: 0.8; transform: scale(1.04); }
+    }
+
+    /* Subtle grid overlay */
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      max-width: 760px;
+      margin-inline: auto;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.9);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      margin-bottom: 32px;
+    }
+
+    .hero-badge .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--green-light);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(1.4); }
+    }
+
+    .wordmark {
+      font-family: var(--font-display);
+      font-size: clamp(3.5rem, 9vw, 6rem);
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .wordmark .oh {
+      color: var(--green-light);
+    }
+
+    .wordmark .sheet-icon {
+      display: inline-block;
+      font-size: 0.7em;
+      transform: translateY(-2px);
+      margin-left: 4px;
+    }
+
+    .hero-tagline {
+      font-size: clamp(1.05rem, 2.5vw, 1.3rem);
+      color: rgba(255,255,255,0.78);
+      font-weight: 400;
+      margin-top: 20px;
+      margin-bottom: 40px;
+      line-height: 1.55;
+    }
+
+    .hero-tagline strong {
+      color: rgba(255,255,255,0.95);
+      font-weight: 600;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-hero {
+      background: var(--white);
+      color: var(--green-deep);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+
+    .btn-hero:hover {
+      background: var(--green-pale);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.3);
+    }
+
+    .hero-subtext {
+      margin-top: 18px;
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    /* Floating sheet preview */
+    .hero-preview {
+      position: relative;
+      z-index: 1;
+      margin-top: 64px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .sheet-preview {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.2);
+      overflow: hidden;
+      width: 100%;
+      max-width: 700px;
+      font-size: 0.8rem;
+    }
+
+    .sheet-header-bar {
+      background: #f1f3f4;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sheet-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .sheet-dot.red    { background: #ff5f57; }
+    .sheet-dot.yellow { background: #febc2e; }
+    .sheet-dot.green  { background: #28c840; }
+
+    .sheet-title {
+      margin-left: 8px;
+      font-size: 0.78rem;
+      color: #5f6368;
+      font-family: var(--font-main);
+    }
+
+    .sheet-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .sheet-table th {
+      background: #f8f9fa;
+      border: 1px solid #e0e0e0;
+      padding: 6px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #3c4043;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .sheet-table td {
+      border: 1px solid #e8eaed;
+      padding: 7px 12px;
+      color: #3c4043;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    .sheet-table tr:hover td {
+      background: #f8f9fa;
+    }
+
+    .badge-pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 100px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .badge-red    { background: #fee2e2; color: #b91c1c; }
+    .badge-amber  { background: #fef3c7; color: #92400e; }
+    .badge-green  { background: #d1fae5; color: #065f46; }
+
+    .cb { color: #5f6368; font-size: 0.9rem; }
+    .strike td { text-decoration: line-through; color: #9ca3af !important; }
+
+    /* ── How it works ──────────────────────────────────────────────── */
+    .how-section {
+      background: var(--off-white);
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--green-mid);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 520px;
+    }
+
+    .section-header {
+      margin-bottom: 56px;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0;
+      position: relative;
+    }
+
+    /* connector line between steps */
+    .steps-grid::before {
+      content: '';
+      position: absolute;
+      top: 44px;
+      left: calc(16.66% + 12px);
+      right: calc(16.66% + 12px);
+      height: 2px;
+      background: linear-gradient(90deg, var(--green-light), var(--amber));
+      border-radius: 2px;
+      z-index: 0;
+    }
+
+    @media (max-width: 700px) {
+      .steps-grid::before { display: none; }
+    }
+
+    .step {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 0 24px;
+    }
+
+    .step-num {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--green-deep);
+      color: var(--white);
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-inline: auto;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 16px rgba(26,71,42,0.3);
+      position: relative;
+    }
+
+    .step-num .step-icon {
+      font-size: 1.3rem;
+    }
+
+    .step-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .step-desc {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    /* ── Features ──────────────────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--white);
+      border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--green-light);
+      box-shadow: var(--shadow-md), 0 0 0 3px rgba(82,183,136,0.12);
+      transform: translateY(-3px);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 18px;
+    }
+
+    .feature-icon.sync    { background: var(--green-pale); }
+    .feature-icon.colors  { background: #fff7ed; }
+    .feature-icon.check   { background: #f0fdf4; }
+    .feature-icon.schools { background: #eff6ff; }
+
+    .feature-title {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .feature-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    /* Urgency chips inside features */
+    .urgency-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .chip-red   { background: var(--red-pale);   color: #b91c1c; }
+    .chip-amber { background: var(--amber-pale);  color: #92400e; }
+    .chip-green { background: var(--green-pale);  color: #166534; }
+
+    /* ── Demo ──────────────────────────────────────────────────────── */
+    .demo-section {
+      background: var(--off-white);
+    }
+
+    .demo-container {
+      max-width: 800px;
+      margin-inline: auto;
+      text-align: center;
+    }
+
+    .demo-video-wrap {
+      margin-top: 48px;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      line-height: 0;
+    }
+
+    .demo-video-wrap video {
+      width: 100%;
+      display: block;
+      border-radius: var(--radius-xl);
+    }
+
+    /* ── Early Access CTA ──────────────────────────────────────────── */
+    .cta-section {
+      background: var(--green-deep);
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 90% at 80% 50%, rgba(82,183,136,0.2) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 60% at 20% 60%, rgba(45,106,79,0.5) 0%, transparent 55%);
+    }
+
+    .cta-section::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    .cta-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 580px;
+      margin-inline: auto;
+    }
+
+    .cta-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .cta-sub {
+      font-size: 1.05rem;
+      color: rgba(255,255,255,0.72);
+      margin-bottom: 36px;
+      line-height: 1.6;
+    }
+
+    .btn-cta {
+      background: var(--white);
+      color: var(--green-deep);
+      font-size: 1.05rem;
+      padding: 16px 36px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+
+    .btn-cta:hover {
+      background: var(--green-pale);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 36px rgba(0,0,0,0.3);
+    }
+
+    .cta-note {
+      margin-top: 16px;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── Footer ────────────────────────────────────────────────────── */
+    footer {
+      background: var(--gray-800);
+      padding-block: 40px;
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-logo {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: -0.03em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .footer-logo .oh { color: var(--green-light); }
+
+    .footer-tagline {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.45);
+      margin-top: 4px;
+    }
+
+    .footer-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.88rem;
+      font-weight: 500;
+      padding: 8px 16px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 100px;
+      transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .footer-link:hover {
+      color: var(--white);
+      border-color: rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.07);
+    }
+
+    /* GitHub SVG icon */
+    .github-icon {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      :root { --section-gap: 64px; }
+
+      .hero { padding-block: 80px 64px; }
+
+      .steps-grid {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      .steps-grid::before { display: none; }
+
+      .sheet-table th:nth-child(4),
+      .sheet-table td:nth-child(4) { display: none; }
+    }
+
+    @media (max-width: 520px) {
+      .nav-logo .logo-wordmark { display: none; }
+
+      .sheet-preview { font-size: 0.7rem; }
+
+      .sheet-table th:nth-child(3),
+      .sheet-table td:nth-child(3) { display: none; }
+    }
+
+    /* ── Subtle scroll reveal animation ────────────────────────────── */
+    @media (prefers-reduced-motion: no-preference) {
+      .reveal {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.55s ease, transform 0.55s ease;
+      }
+
+      .reveal.visible {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Nav ──────────────────────────────────────────────────────── -->
+  <nav aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo" aria-label="OhSheet home">
+        <span class="logo-icon">🟢</span>
+        <span class="logo-wordmark"><span class="oh">Oh</span>Sheet</span>
+      </a>
+      <a href="https://forms.gle/PLACEHOLDER" class="btn btn-primary nav-cta" target="_blank" rel="noopener">
+        Get Early Access
+      </a>
+    </div>
+  </nav>
+
+
+  <!-- ── Hero ─────────────────────────────────────────────────────── -->
+  <section class="hero" aria-labelledby="hero-heading">
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="dot"></span>
+          Early Access — Limited Spots
+        </div>
+
+        <h1 class="wordmark" id="hero-heading">
+          <span class="oh">Oh</span>Sheet<span class="sheet-icon">📋</span>
+        </h1>
+
+        <p class="hero-tagline">
+          Your <strong>Canvas assignments</strong>, automatically organized<br>in Google Sheets. No copy-paste. No forgetting due dates.
+        </p>
+
+        <div class="hero-actions">
+          <a href="https://forms.gle/PLACEHOLDER" class="btn btn-hero" target="_blank" rel="noopener">
+            ✨ Get Early Access
+          </a>
+          <a href="#how-it-works" class="btn btn-outline" style="color:rgba(255,255,255,0.85); border-color:rgba(255,255,255,0.35);">
+            See how it works
+          </a>
+        </div>
+        <p class="hero-subtext">Free during early access &middot; No credit card required</p>
+      </div>
+
+      <!-- Mini Google Sheet preview -->
+      <div class="hero-preview">
+        <div class="sheet-preview" role="img" aria-label="Preview of OhSheet Google Sheets output showing color-coded assignments">
+          <div class="sheet-header-bar">
+            <span class="sheet-dot red"></span>
+            <span class="sheet-dot yellow"></span>
+            <span class="sheet-dot green"></span>
+            <span class="sheet-title">📊 My Assignments — OhSheet</span>
+          </div>
+          <table class="sheet-table" aria-hidden="true">
+            <thead>
+              <tr>
+                <th>✓</th>
+                <th>Course</th>
+                <th>Assignment</th>
+                <th>Due Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cb">☐</td>
+                <td>CS 3450</td>
+                <td>Lab 7: Sorting Algorithms</td>
+                <td>Mar 15</td>
+                <td><span class="badge-pill badge-red">Overdue</span></td>
+              </tr>
+              <tr>
+                <td class="cb">☐</td>
+                <td>ENGL 1010</td>
+                <td>Essay Draft 2</td>
+                <td>Mar 17</td>
+                <td><span class="badge-pill badge-amber">2 days</span></td>
+              </tr>
+              <tr>
+                <td class="cb">☐</td>
+                <td>MATH 2210</td>
+                <td>Problem Set 9</td>
+                <td>Mar 19</td>
+                <td><span class="badge-pill badge-amber">4 days</span></td>
+              </tr>
+              <tr>
+                <td class="cb">☐</td>
+                <td>BIO 1610</td>
+                <td>Lab Report — Osmosis</td>
+                <td>Mar 24</td>
+                <td><span class="badge-pill badge-green">9 days</span></td>
+              </tr>
+              <tr class="strike">
+                <td class="cb" style="color:#22c55e;">☑</td>
+                <td>CS 3450</td>
+                <td>Lab 6: Linked Lists</td>
+                <td>Mar 10</td>
+                <td><span class="badge-pill badge-green">Done</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── How it works ──────────────────────────────────────────────── -->
+  <section class="how-section" id="how-it-works" aria-labelledby="how-heading">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">How it works</span>
+        <h2 class="section-title" id="how-heading">Set it up once.<br>Forget about it forever.</h2>
+        <p class="section-sub">Three steps, then OhSheet handles the rest on autopilot.</p>
+      </div>
+
+      <div class="steps-grid">
+        <div class="step reveal">
+          <div class="step-num">
+            <span class="step-icon">🔑</span>
+          </div>
+          <h3 class="step-title">Connect Canvas</h3>
+          <p class="step-desc">Grab your Canvas API token from your account settings and add it to OhSheet. That's it — read-only, no passwords, no OAuth dance.</p>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num">
+            <span class="step-icon">⚡</span>
+          </div>
+          <h3 class="step-title">OhSheet syncs automatically</h3>
+          <p class="step-desc">OhSheet runs on a schedule and pulls your upcoming assignments from every course — deduplicating as it goes so you never get duplicates.</p>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num">
+            <span class="step-icon">📊</span>
+          </div>
+          <h3 class="step-title">Open your Sheet</h3>
+          <p class="step-desc">Your Google Sheet stays fresh and organized — sorted by due date, color-coded by urgency, with checkboxes ready to strike through completed work.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Features ──────────────────────────────────────────────────── -->
+  <section id="features" aria-labelledby="features-heading">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Features</span>
+        <h2 class="section-title" id="features-heading">Everything you wish<br>Canvas had built in.</h2>
+        <p class="section-sub">Built specifically for students who live in spreadsheets.</p>
+      </div>
+
+      <div class="features-grid">
+
+        <div class="feature-card reveal">
+          <div class="feature-icon sync">⏱️</div>
+          <h3 class="feature-title">Auto-sync on a schedule</h3>
+          <p class="feature-desc">OhSheet runs automatically on a cron schedule — no manual exports, no browser extensions, no remembering to run anything. Your sheet just stays current.</p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon colors">🎨</div>
+          <h3 class="feature-title">Color-coded urgency</h3>
+          <p class="feature-desc">Rows are automatically colored so you can see what needs attention at a glance — no more digging through Canvas to figure out what's due soonest.</p>
+          <div class="urgency-chips">
+            <span class="chip chip-red">🔴 Overdue</span>
+            <span class="chip chip-amber">🟡 Due soon</span>
+            <span class="chip chip-green">🟢 Plenty of time</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon check">✅</div>
+          <h3 class="feature-title">Check off assignments</h3>
+          <p class="feature-desc">Checkboxes in your Sheet let you mark assignments done — the row automatically strikes through so you can see exactly what's left without the noise.</p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon schools">🏫</div>
+          <h3 class="feature-title">Works with any Canvas school</h3>
+          <p class="feature-desc">If your school runs Canvas LMS, OhSheet works. No special integrations, no IT approval needed — just your API token and your Google account.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Demo ──────────────────────────────────────────────────────── -->
+  <section class="demo-section" id="demo" aria-labelledby="demo-heading">
+    <div class="container">
+      <div class="demo-container">
+        <div class="section-header reveal">
+          <span class="section-label">Demo</span>
+          <h2 class="section-title" id="demo-heading">Canvas is a mess.<br>OhSheet fixes that.</h2>
+        </div>
+
+        <div class="demo-video-wrap reveal">
+          <video
+            autoplay
+            loop
+            muted
+            playsinline
+            poster="media/OhSheetGIF.gif"
+            aria-label="OhSheet demo: assignments syncing from Canvas into a Google Sheet"
+          >
+            <source src="media/OhSheetDemo.mp4" type="video/mp4" />
+            <img src="media/OhSheetGIF.gif" alt="OhSheet demo" />
+          </video>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Early Access CTA ────────────────────────────────────────── -->
+  <section class="cta-section" id="early-access" aria-labelledby="cta-heading">
+    <div class="container">
+      <div class="cta-inner reveal">
+        <h2 class="cta-title" id="cta-heading">Want early access?</h2>
+        <p class="cta-sub">
+          Drop your email and I'll reach out personally when OhSheet is ready for more users. No spam — just an update when it's live.
+        </p>
+        <a href="https://forms.gle/PLACEHOLDER" class="btn btn-cta" target="_blank" rel="noopener">
+          ✉️ &nbsp;Join the list
+        </a>
+        <p class="cta-note">Free during early access &nbsp;&middot;&nbsp; Unsubscribe anytime</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Footer ────────────────────────────────────────────────────── -->
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div>
+          <div class="footer-logo">
+            <span>🟢</span>
+            <span><span class="oh">Oh</span>Sheet</span>
+          </div>
+          <p class="footer-tagline">Built by a student, for students.</p>
+        </div>
+
+        <a
+          href="https://github.com/PLACEHOLDER/ohsheet"
+          class="footer-link"
+          target="_blank"
+          rel="noopener"
+          aria-label="View OhSheet on GitHub"
+        >
+          <svg class="github-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+          </svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </footer>
+
+
+  <!-- ── Scroll reveal ──────────────────────────────────────────────── -->
+  <script>
+    (function () {
+      if (!window.IntersectionObserver) return;
+
+      var els = document.querySelectorAll('.reveal');
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+      els.forEach(function (el) { observer.observe(el); });
+    })();
+  </script>
+
+</body>
+</html>
