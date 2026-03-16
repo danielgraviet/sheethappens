@@ -162,7 +162,7 @@
       height: 32px;
       background: var(--green-deep);
       border-radius: 8px;
-      font-size: 1rem;
+      color: #fff;
     }
 
     .nav-cta {
@@ -259,9 +259,17 @@
 
     .wordmark .sheet-icon {
       display: inline-block;
-      font-size: 0.7em;
-      transform: translateY(-2px);
-      margin-left: 4px;
+      font-size: 0.72em;
+      transform: translateY(-4px);
+      margin-left: 6px;
+      color: var(--green-light);
+      filter: drop-shadow(0 0 8px rgba(82,183,136,0.7)) drop-shadow(0 0 20px rgba(82,183,136,0.35));
+      animation: sparkleFloat 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes sparkleFloat {
+      0%   { transform: translateY(-4px) rotate(0deg) scale(1); }
+      100% { transform: translateY(-7px) rotate(12deg) scale(1.08); }
     }
 
     .hero-tagline {
@@ -477,7 +485,16 @@
     }
 
     .step-num .step-icon {
-      font-size: 1.3rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #4ade80;
+      filter: drop-shadow(0 0 6px rgba(74, 222, 128, 0.8)) drop-shadow(0 0 12px rgba(74, 222, 128, 0.4));
+    }
+
+    .step-num.icon-lightning .step-icon {
+      color: #fbbf24;
+      filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.9)) drop-shadow(0 0 14px rgba(251, 191, 36, 0.5));
     }
 
     .step-title {
@@ -523,9 +540,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.4rem;
       margin-bottom: 18px;
     }
+
+    .feature-icon.sync    svg { color: #166534; }
+    .feature-icon.colors  svg { color: #92400e; }
+    .feature-icon.check   svg { color: #166534; }
+    .feature-icon.schools svg { color: #1e40af; }
 
     .feature-icon.sync    { background: var(--green-pale); }
     .feature-icon.colors  { background: #fff7ed; }
@@ -769,7 +790,7 @@
   <nav aria-label="Main navigation">
     <div class="nav-inner">
       <a href="#" class="nav-logo" aria-label="OhSheet home">
-        <span class="logo-icon">🟢</span>
+        <span class="logo-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
         <span class="logo-wordmark"><span class="oh">Oh</span>Sheet</span>
       </a>
       <a href="https://forms.gle/PLACEHOLDER" class="btn btn-primary nav-cta" target="_blank" rel="noopener">
@@ -789,7 +810,7 @@
         </div>
 
         <h1 class="wordmark" id="hero-heading">
-          <span class="oh">Oh</span>Sheet<span class="sheet-icon">📋</span>
+          <span class="oh">Oh</span>Sheet<span class="sheet-icon"><svg xmlns="http://www.w3.org/2000/svg" width="0.72em" height="0.72em" viewBox="0 0 32 32" fill="currentColor"><path d="M13 2 C13 2 14.2 8.8 10 13 C5.8 17.2 0 18 0 18 C0 18 5.8 18.8 10 23 C14.2 27.2 13 34 13 34 L13 32 C13 32 14.2 26.8 18 23 C21.8 19.2 26 18 26 18 C26 18 21.8 16.8 18 13 C14.2 9.2 13 4 13 2 Z" transform="translate(3,-2)"/><path d="M24 4 C24 4 24.7 7.3 22 10 C19.3 12.7 16 13 16 13 C16 13 19.3 13.3 22 16 C24.7 18.7 24 22 24 22 L24 21 C24 21 24.7 17.7 27 15 C29.3 12.3 32 12 32 12 C32 12 29.3 11.3 27 9 C24.7 6.7 24 4 24 4 Z" opacity="0.65"/></svg></span>
         </h1>
 
         <p class="hero-tagline">
@@ -798,7 +819,7 @@
 
         <div class="hero-actions">
           <a href="https://forms.gle/PLACEHOLDER" class="btn btn-hero" target="_blank" rel="noopener">
-            ✨ Get Early Access
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Get Early Access
           </a>
           <a href="#how-it-works" class="btn btn-outline" style="color:rgba(255,255,255,0.85); border-color:rgba(255,255,255,0.35);">
             See how it works
@@ -814,12 +835,12 @@
             <span class="sheet-dot red"></span>
             <span class="sheet-dot yellow"></span>
             <span class="sheet-dot green"></span>
-            <span class="sheet-title">📊 My Assignments — OhSheet</span>
+            <span class="sheet-title"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>My Assignments — OhSheet</span>
           </div>
           <table class="sheet-table" aria-hidden="true">
             <thead>
               <tr>
-                <th>✓</th>
+                <th><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></th>
                 <th>Course</th>
                 <th>Assignment</th>
                 <th>Due Date</th>
@@ -828,35 +849,35 @@
             </thead>
             <tbody>
               <tr>
-                <td class="cb">☐</td>
+                <td class="cb"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg></td>
                 <td>CS 3450</td>
                 <td>Lab 7: Sorting Algorithms</td>
                 <td>Mar 15</td>
                 <td><span class="badge-pill badge-red">Overdue</span></td>
               </tr>
               <tr>
-                <td class="cb">☐</td>
+                <td class="cb"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg></td>
                 <td>ENGL 1010</td>
                 <td>Essay Draft 2</td>
                 <td>Mar 17</td>
                 <td><span class="badge-pill badge-amber">2 days</span></td>
               </tr>
               <tr>
-                <td class="cb">☐</td>
+                <td class="cb"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg></td>
                 <td>MATH 2210</td>
                 <td>Problem Set 9</td>
                 <td>Mar 19</td>
                 <td><span class="badge-pill badge-amber">4 days</span></td>
               </tr>
               <tr>
-                <td class="cb">☐</td>
+                <td class="cb"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg></td>
                 <td>BIO 1610</td>
                 <td>Lab Report — Osmosis</td>
                 <td>Mar 24</td>
                 <td><span class="badge-pill badge-green">9 days</span></td>
               </tr>
               <tr class="strike">
-                <td class="cb" style="color:#22c55e;">☑</td>
+                <td class="cb" style="color:#22c55e;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="9 12 11 14 15 10"/></svg></td>
                 <td>CS 3450</td>
                 <td>Lab 6: Linked Lists</td>
                 <td>Mar 10</td>
@@ -882,15 +903,15 @@
       <div class="steps-grid">
         <div class="step reveal">
           <div class="step-num">
-            <span class="step-icon">🔑</span>
+            <span class="step-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg></span>
           </div>
           <h3 class="step-title">Connect Canvas</h3>
           <p class="step-desc">Grab your Canvas API token from your account settings and add it to OhSheet. That's it — read-only, no passwords, no OAuth dance.</p>
         </div>
 
         <div class="step reveal">
-          <div class="step-num">
-            <span class="step-icon">⚡</span>
+          <div class="step-num icon-lightning">
+            <span class="step-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
           </div>
           <h3 class="step-title">OhSheet syncs automatically</h3>
           <p class="step-desc">OhSheet runs on a schedule and pulls your upcoming assignments from every course — deduplicating as it goes so you never get duplicates.</p>
@@ -898,7 +919,7 @@
 
         <div class="step reveal">
           <div class="step-num">
-            <span class="step-icon">📊</span>
+            <span class="step-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
           </div>
           <h3 class="step-title">Open your Sheet</h3>
           <p class="step-desc">Your Google Sheet stays fresh and organized — sorted by due date, color-coded by urgency, with checkboxes ready to strike through completed work.</p>
@@ -920,30 +941,30 @@
       <div class="features-grid">
 
         <div class="feature-card reveal">
-          <div class="feature-icon sync">⏱️</div>
+          <div class="feature-icon sync"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
           <h3 class="feature-title">Auto-sync on a schedule</h3>
           <p class="feature-desc">OhSheet runs automatically on a cron schedule — no manual exports, no browser extensions, no remembering to run anything. Your sheet just stays current.</p>
         </div>
 
         <div class="feature-card reveal">
-          <div class="feature-icon colors">🎨</div>
+          <div class="feature-icon colors"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
           <h3 class="feature-title">Color-coded urgency</h3>
           <p class="feature-desc">Rows are automatically colored so you can see what needs attention at a glance — no more digging through Canvas to figure out what's due soonest.</p>
           <div class="urgency-chips">
-            <span class="chip chip-red">🔴 Overdue</span>
-            <span class="chip chip-amber">🟡 Due soon</span>
-            <span class="chip chip-green">🟢 Plenty of time</span>
+            <span class="chip chip-red"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:5px;vertical-align:1px"></span>Overdue</span>
+            <span class="chip chip-amber"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:5px;vertical-align:1px"></span>Due soon</span>
+            <span class="chip chip-green"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:5px;vertical-align:1px"></span>Plenty of time</span>
           </div>
         </div>
 
         <div class="feature-card reveal">
-          <div class="feature-icon check">✅</div>
+          <div class="feature-icon check"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
           <h3 class="feature-title">Check off assignments</h3>
           <p class="feature-desc">Checkboxes in your Sheet let you mark assignments done — the row automatically strikes through so you can see exactly what's left without the noise.</p>
         </div>
 
         <div class="feature-card reveal">
-          <div class="feature-icon schools">🏫</div>
+          <div class="feature-icon schools"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
           <h3 class="feature-title">Works with any Canvas school</h3>
           <p class="feature-desc">If your school runs Canvas LMS, OhSheet works. No special integrations, no IT approval needed — just your API token and your Google account.</p>
         </div>
@@ -957,11 +978,6 @@
   <section class="demo-section" id="demo" aria-labelledby="demo-heading">
     <div class="container">
       <div class="demo-container">
-        <div class="section-header reveal">
-          <span class="section-label">Demo</span>
-          <h2 class="section-title" id="demo-heading">Canvas is a mess.<br>OhSheet fixes that.</h2>
-        </div>
-
         <div class="demo-video-wrap reveal">
           <video
             autoplay
@@ -989,7 +1005,7 @@
           Drop your email and I'll reach out personally when OhSheet is ready for more users. No spam — just an update when it's live.
         </p>
         <a href="https://forms.gle/PLACEHOLDER" class="btn btn-cta" target="_blank" rel="noopener">
-          ✉️ &nbsp;Join the list
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:8px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Join the list
         </a>
         <p class="cta-note">Free during early access &nbsp;&middot;&nbsp; Unsubscribe anytime</p>
       </div>
@@ -1003,7 +1019,7 @@
       <div class="footer-inner">
         <div>
           <div class="footer-logo">
-            <span>🟢</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--green-deep);border-radius:6px;color:#fff"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
             <span><span class="oh">Oh</span>Sheet</span>
           </div>
           <p class="footer-tagline">Built by a student, for students.</p>
