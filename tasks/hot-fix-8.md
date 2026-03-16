@@ -1,0 +1,1 @@
+- add a new column next to column D "Due Date" that shows days left. have it be simple and just subtract current day from due date. have it color coded so when it is closer to deadline it should be red. 

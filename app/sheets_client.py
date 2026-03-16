@@ -15,9 +15,23 @@ logger = logging.getLogger(__name__)
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SHEET_RANGE = "Sheet1!A1"
 
-# Column contract — order must stay stable.
-COLUMNS = ["course_name", "assignment_name", "due_at", "url", "assignment_id", "synced_at"]
-HEADERS = ["Course", "Assignment", "Due Date", "Link", "Assignment ID", "Synced At"]
+# Column A is a checkbox (Done); data columns start at B.
+COLUMNS = ["done", "course_name", "assignment_name", "due_at", "days_left", "url"]
+HEADERS = ["Done", "Course", "Assignment", "Due Date", "Days Left", "Link"]
+
+# Last synced timestamp is written here — outside the data table
+_LAST_SYNCED_CELL = "Sheet1!H1"
+
+# Column indices (0-based)
+_DUE_DATE_COL_INDEX = 3
+_DAYS_LEFT_COL_INDEX = 4
+
+# Course name → row background color (RGB 0-1 scale)
+_COURSE_COLORS: dict[str, dict] = {
+    "REL":      {"red": 0.85, "green": 0.73, "blue": 0.95},  # lavender
+    "MATH 112": {"red": 0.68, "green": 0.85, "blue": 0.95},  # sky blue
+    "CS 180":   {"red": 0.71, "green": 0.90, "blue": 0.72},  # mint green
+}
 
 
 class SheetsAuthError(Exception):
@@ -37,7 +51,6 @@ class SheetsClient:
     def _build_service(self) -> Any:
         try:
             creds_value = settings.google_creds_json.strip()
-            # Accept either a file path (e.g. "secret.json") or raw JSON string.
             if creds_value.endswith(".json") and not creds_value.startswith("{"):
                 with open(creds_value) as f:
                     creds_dict = json.load(f)
@@ -69,7 +82,7 @@ class SheetsClient:
             return 0
 
         synced_at = datetime.now(timezone.utc)
-        rows = [self._to_row(a, synced_at) for a in assignments]
+        rows = [self._to_row(a) for a in assignments]
 
         if self._dry_run:
             logger.info(
@@ -83,11 +96,18 @@ class SheetsClient:
         self._ensure_headers()
 
         try:
-            self._service.spreadsheets().values().append(
+            # Use column B (Course) to find the last row with data — column A is
+            # always an empty checkbox, so it can't be used for table detection.
+            col_b = self._service.spreadsheets().values().get(
                 spreadsheetId=self._spreadsheet_id,
-                range=SHEET_RANGE,
+                range="Sheet1!B:B",
+            ).execute()
+            next_row = len(col_b.get("values", [])) + 1
+
+            self._service.spreadsheets().values().update(
+                spreadsheetId=self._spreadsheet_id,
+                range=f"Sheet1!A{next_row}",
                 valueInputOption="USER_ENTERED",
-                insertDataOption="INSERT_ROWS",
                 body={"values": rows},
             ).execute()
         except HttpError as exc:
@@ -97,11 +117,26 @@ class SheetsClient:
         except Exception as exc:
             raise SheetsAPIError(f"Unexpected Sheets error: {exc}") from exc
 
+        # Update the single "Last synced" timestamp in G1
+        synced_label = (
+            f"Last synced: {synced_at.strftime('%b')} {synced_at.day}, "
+            f"{synced_at.year} {synced_at.strftime('%-I:%M %p')} UTC"
+        )
+        try:
+            self._service.spreadsheets().values().update(
+                spreadsheetId=self._spreadsheet_id,
+                range=_LAST_SYNCED_CELL,
+                valueInputOption="RAW",
+                body={"values": [[synced_label]]},
+            ).execute()
+        except HttpError:
+            pass  # non-fatal
+
         logger.info("Appended %d row(s) to spreadsheet %s.", len(rows), self._spreadsheet_id)
         return len(rows)
 
     def _ensure_headers(self) -> None:
-        """Write the header row to A1 if the sheet is empty."""
+        """Write the header row to A1 if the sheet is empty, then apply formatting."""
         try:
             result = self._service.spreadsheets().values().get(
                 spreadsheetId=self._spreadsheet_id,
@@ -116,19 +151,292 @@ class SheetsClient:
                 body={"values": [HEADERS]},
             ).execute()
             logger.info("Wrote header row to spreadsheet.")
+            self._apply_formatting()
         except HttpError as exc:
             raise SheetsAPIError(f"Failed to write headers: {exc}") from exc
 
-    def _to_row(self, assignment: Assignment, synced_at: datetime) -> list[str]:
-        """Serialize an Assignment to a Sheets row following COLUMNS order."""
-        # Human-readable due date
-        if assignment.due_at:
-            dt = assignment.due_at
-            due_str = f"{dt.strftime('%b')} {dt.day}, {dt.year} {dt.strftime('%-I:%M %p')} UTC"
-        else:
-            due_str = ""
+    def _get_sheet_id(self) -> int:
+        """Return the numeric sheetId for Sheet1 (needed for batchUpdate requests)."""
+        result = self._service.spreadsheets().get(
+            spreadsheetId=self._spreadsheet_id,
+            fields="sheets.properties",
+        ).execute()
+        for sheet in result.get("sheets", []):
+            props = sheet.get("properties", {})
+            if props.get("title") == "Sheet1":
+                return props["sheetId"]
+        return 0  # fallback: first sheet is always 0
 
-        # Full, clickable URL
+    def reapply_formatting(self) -> None:
+        """Clear all conditional format rules on Sheet1 then reapply full formatting."""
+        sheet_id = self._get_sheet_id()
+
+        # Fetch existing conditional format rules so we can delete them first
+        result = self._service.spreadsheets().get(
+            spreadsheetId=self._spreadsheet_id,
+            fields="sheets.conditionalFormats,sheets.properties",
+        ).execute()
+
+        delete_requests: list[dict] = []
+        for sheet in result.get("sheets", []):
+            if sheet.get("properties", {}).get("sheetId") == sheet_id:
+                rules = sheet.get("conditionalFormats", [])
+                # Delete in reverse order so indices stay valid
+                for i in range(len(rules) - 1, -1, -1):
+                    delete_requests.append({
+                        "deleteConditionalFormatRule": {
+                            "sheetId": sheet_id,
+                            "index": i,
+                        }
+                    })
+
+        if delete_requests:
+            self._service.spreadsheets().batchUpdate(
+                spreadsheetId=self._spreadsheet_id,
+                body={"requests": delete_requests},
+            ).execute()
+
+        self._apply_formatting()
+
+    def _apply_formatting(self) -> None:
+        """
+        Apply one-time formatting after headers are written:
+        - Bold/large/dark header row, frozen
+        - Checkbox data validation on column A
+        - Conditional format: strikethrough + grey when Done is checked
+        - Conditional format: row color per course name
+        """
+        sheet_id = self._get_sheet_id()
+        num_cols = len(HEADERS)
+
+        data_range = {
+            "sheetId": sheet_id,
+            "startRowIndex": 1,
+            "endRowIndex": 100,
+            "startColumnIndex": 0,
+            "endColumnIndex": num_cols,
+        }
+
+        requests: list[dict] = [
+            # Style the header row: dark bg, white bold text, centered, larger font
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 0,
+                        "endRowIndex": 1,
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "backgroundColor": {"red": 0.15, "green": 0.15, "blue": 0.15},
+                            "textFormat": {
+                                "bold": True,
+                                "fontSize": 12,
+                                "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0},
+                            },
+                            "horizontalAlignment": "CENTER",
+                            "verticalAlignment": "MIDDLE",
+                        }
+                    },
+                    "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)",
+                }
+            },
+            # Freeze the header row
+            {
+                "updateSheetProperties": {
+                    "properties": {
+                        "sheetId": sheet_id,
+                        "gridProperties": {"frozenRowCount": 1},
+                    },
+                    "fields": "gridProperties.frozenRowCount",
+                }
+            },
+            # Checkbox data validation for column A (rows 2-1000)
+            {
+                "setDataValidation": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "endRowIndex": 100,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 1,
+                    },
+                    "rule": {
+                        "condition": {"type": "BOOLEAN"},
+                        "strict": True,
+                    },
+                }
+            },
+            # Date number format for Due Date column (col D) — shows calendar picker on click
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "endRowIndex": 100,
+                        "startColumnIndex": _DUE_DATE_COL_INDEX,
+                        "endColumnIndex": _DUE_DATE_COL_INDEX + 1,
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "numberFormat": {"type": "DATE", "pattern": "mmm d, yyyy"},
+                        }
+                    },
+                    "fields": "userEnteredFormat.numberFormat",
+                }
+            },
+            # Date data validation for Due Date column — enforces calendar picker
+            {
+                "setDataValidation": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "endRowIndex": 100,
+                        "startColumnIndex": _DUE_DATE_COL_INDEX,
+                        "endColumnIndex": _DUE_DATE_COL_INDEX + 1,
+                    },
+                    "rule": {
+                        "condition": {"type": "DATE_IS_VALID"},
+                        "strict": False,
+                        "showCustomUi": True,
+                    },
+                }
+            },
+        ]
+
+        # Number format for Days Left column (col E) — plain integer, not a date
+        requests.append({
+            "repeatCell": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 1,
+                    "endRowIndex": 100,
+                    "startColumnIndex": _DAYS_LEFT_COL_INDEX,
+                    "endColumnIndex": _DAYS_LEFT_COL_INDEX + 1,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "numberFormat": {"type": "NUMBER", "pattern": "0"},
+                        "horizontalAlignment": "CENTER",
+                    }
+                },
+                "fields": "userEnteredFormat(numberFormat,horizontalAlignment)",
+            }
+        })
+
+        # Days Left color rules — applied only to col E, highest priority first
+        days_left_range = {
+            "sheetId": sheet_id,
+            "startRowIndex": 1,
+            "endRowIndex": 100,
+            "startColumnIndex": _DAYS_LEFT_COL_INDEX,
+            "endColumnIndex": _DAYS_LEFT_COL_INDEX + 1,
+        }
+        urgency_rules = [
+            # Overdue or due today — deep red
+            ('=AND($E2<>"",$E2<=0)',  {"red": 0.90, "green": 0.18, "blue": 0.18}),
+            # 1–2 days — red-orange
+            ('=AND($E2<>"",$E2<=2)',  {"red": 0.96, "green": 0.42, "blue": 0.26}),
+            # 3–5 days — amber
+            ('=AND($E2<>"",$E2<=5)',  {"red": 0.98, "green": 0.75, "blue": 0.18}),
+            # 6+ days — green
+            ('=AND($E2<>"",$E2>5)',   {"red": 0.42, "green": 0.78, "blue": 0.42}),
+        ]
+        # Urgency rules on col E only — insert in reverse so highest priority ends up at index 0
+        for formula, color in reversed(urgency_rules):
+            requests.append({
+                "addConditionalFormatRule": {
+                    "rule": {
+                        "ranges": [days_left_range],
+                        "booleanRule": {
+                            "condition": {
+                                "type": "CUSTOM_FORMULA",
+                                "values": [{"userEnteredValue": formula}],
+                            },
+                            "format": {"backgroundColor": color},
+                        },
+                    },
+                    "index": 0,
+                }
+            })
+
+        # Course color rules — split range to EXCLUDE col E so urgency colors show through.
+        # Each rule covers A-D (cols 0-4) and F (col 5) as two separate ranges.
+        for i, (course, color) in enumerate(_COURSE_COLORS.items()):
+            course_ranges = [
+                # A through D (Done, Course, Assignment, Due Date)
+                {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 1,
+                    "endRowIndex": 100,
+                    "startColumnIndex": 0,
+                    "endColumnIndex": _DAYS_LEFT_COL_INDEX,
+                },
+                # F (Link) — skips col E (Days Left)
+                {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 1,
+                    "endRowIndex": 100,
+                    "startColumnIndex": _DAYS_LEFT_COL_INDEX + 1,
+                    "endColumnIndex": len(HEADERS),
+                },
+            ]
+            requests.append({
+                "addConditionalFormatRule": {
+                    "rule": {
+                        "ranges": course_ranges,
+                        "booleanRule": {
+                            "condition": {
+                                "type": "CUSTOM_FORMULA",
+                                "values": [{"userEnteredValue": f'=$B2="{course}"'}],
+                            },
+                            "format": {"backgroundColor": color},
+                        },
+                    },
+                    "index": i + 1,
+                }
+            })
+
+        # Strikethrough rule — added LAST so it inserts at index 0 = highest priority.
+        # Uses =$A2 (truthy check) which reliably matches Sheets boolean checkbox values.
+        requests.append({
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [data_range],
+                    "booleanRule": {
+                        "condition": {
+                            "type": "CUSTOM_FORMULA",
+                            "values": [{"userEnteredValue": "=$A2"}],
+                        },
+                        "format": {
+                            "textFormat": {
+                                "strikethrough": True,
+                                "foregroundColor": {"red": 0.6, "green": 0.6, "blue": 0.6},
+                            },
+                            "backgroundColor": {"red": 0.92, "green": 0.92, "blue": 0.92},
+                        },
+                    },
+                },
+                "index": 0,
+            }
+        })
+
+        try:
+            self._service.spreadsheets().batchUpdate(
+                spreadsheetId=self._spreadsheet_id,
+                body={"requests": requests},
+            ).execute()
+            logger.info("Applied sheet formatting (headers, checkboxes, conditional formats).")
+        except HttpError as exc:
+            # Non-fatal: formatting is cosmetic, log and continue
+            logger.warning("Failed to apply sheet formatting: %s", exc)
+
+    def _to_row(self, assignment: Assignment) -> list[str]:
+        """Serialize an Assignment to a Sheets row following COLUMNS order."""
+        # Write as YYYY-MM-DD — Sheets parses this as a native date value,
+        # which enables the calendar picker when editing the cell.
+        due_str = assignment.due_at.strftime("%Y-%m-%d") if assignment.due_at else ""
+
         url = assignment.url
         if url and url.startswith("/"):
             domain = settings.canvas_domain.rstrip("/")
@@ -137,17 +445,11 @@ class SheetsClient:
             url = f"{domain}{url}"
         link = f'=HYPERLINK("{url}", "Open →")' if url else ""
 
-        # Human-readable synced timestamp
-        synced_str = (
-            f"{synced_at.strftime('%b')} {synced_at.day}, {synced_at.year} "
-            f"{synced_at.strftime('%-I:%M %p')} UTC"
-        )
-
         return [
+            "",  # Done — checkbox managed by data validation in col A
             assignment.course_name,
             assignment.assignment_name,
             due_str,
+            '=IF(INDIRECT("D"&ROW())="","",INDIRECT("D"&ROW())-TODAY())',  # Days Left — blank if no due date
             link,
-            assignment.assignment_id,
-            synced_str,
         ]

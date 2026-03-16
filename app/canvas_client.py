@@ -12,7 +12,8 @@ TIMEOUT = 10.0
 MAX_RETRIES = 3
 DEFAULT_DAYS = 30
 MAX_DAYS = 365
-MAX_PAGES = 20  # safety cap (~1000 planner items max)
+MAX_PAGES = 20  # safety cap
+MAX_ITEMS = 50  # hard cap on total assignments returned
 
 
 class CanvasAuthError(Exception):
@@ -66,6 +67,9 @@ class CanvasClient:
             items.extend(
                 item for item in page if item.get("plannable_type") == "assignment"
             )
+            if len(items) >= MAX_ITEMS:
+                items = items[:MAX_ITEMS]
+                break
             url = self._next_page(response)
 
         if page_count >= MAX_PAGES:

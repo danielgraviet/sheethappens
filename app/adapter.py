@@ -1,10 +1,26 @@
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
 from app.models import Assignment
 
 logger = logging.getLogger(__name__)
+
+# Maps a regex pattern (matched against the raw context_name) to a short label.
+# Patterns are checked in order; first match wins.
+_COURSE_NAME_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"\bREL\b", re.IGNORECASE), "REL"),
+    (re.compile(r"\bMATH\s*112\b", re.IGNORECASE), "MATH 112"),
+    (re.compile(r"\bC\s*S\s*180\b", re.IGNORECASE), "CS 180"),
+]
+
+
+def _normalize_course_name(raw_name: str) -> str:
+    for pattern, label in _COURSE_NAME_PATTERNS:
+        if pattern.search(raw_name):
+            return label
+    return raw_name
 
 
 class AssignmentAdapter:
@@ -22,7 +38,9 @@ class AssignmentAdapter:
                 logger.warning("Skipping Canvas item with no assignment_id: %s", raw)
                 return None
 
-            course_name = (raw.get("context_name") or "Unknown Course").strip()
+            course_name = _normalize_course_name(
+                (raw.get("context_name") or "Unknown Course").strip()
+            )
             assignment_name = (plannable.get("title") or "Untitled Assignment").strip()
 
             due_at: datetime | None = None

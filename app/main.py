@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import date
 
 import redis
 from fastapi import FastAPI, Query
@@ -28,16 +29,37 @@ class SyncResult(BaseModel):
     failures: int
 
 
+@app.get("/format")
+def format_sheet() -> dict:
+    """Reapply all sheet formatting (headers, checkboxes, conditional rules)."""
+    try:
+        sheets = SheetsClient()
+        sheets.reapply_formatting()
+        return {"status": "ok", "message": "Formatting reapplied successfully."}
+    except (SheetsAuthError, SheetsAPIError) as exc:
+        logger.error("Failed to reapply formatting: %s", exc)
+        return {"status": "error", "message": str(exc)}
+
+
 @app.get("/health")
 def health() -> dict:
     logger.info("Health check requested")
     return {"status": "ok", "service": "sheethappens"}
 
 
+def _days_until_end_of_week() -> int:
+    """Return the number of days from today until Sunday (end of current week), minimum 1."""
+    today = date.today()
+    days_left = 6 - today.weekday()  # Monday=0, Sunday=6
+    return max(days_left, 1)
+
+
 @app.get("/sync", response_model=SyncResult)
 def sync(
-    days: int = Query(default=30, ge=1, le=365, description="How many days ahead to fetch assignments"),
+    days: int = Query(default=None, ge=1, le=365, description="How many days ahead to fetch assignments (default: rest of current week)"),
 ) -> SyncResult:
+    if days is None:
+        days = _days_until_end_of_week()
     started_at = time.monotonic()
     logger.info("Sync started (window: %d days).", days)
 

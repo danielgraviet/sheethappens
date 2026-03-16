@@ -4,6 +4,34 @@ Operational guide for common incidents and maintenance tasks.
 
 ---
 
+## Quick Start: Trigger a Sync
+
+**Locally:**
+```bash
+# Start the server
+uv run uvicorn app.main:app --reload
+
+# In another terminal, trigger a sync
+curl http://localhost:8000/sync
+
+curl http://localhost:8000/format
+
+# Or with a custom lookahead window (default is 30 days)
+curl "http://localhost:8000/sync?days=7"
+```
+
+**Clear Cache:**
+- go to upstash cli
+- go to "data browser"
+- type FLUSHDB
+
+**Production (Railway):**
+```bash
+curl https://<your-railway-domain>/sync
+```
+
+---
+
 ## Validating Service Health
 
 ```bash
