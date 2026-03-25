@@ -7,7 +7,7 @@ from pathlib import Path
 import redis
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
 from app.adapter import AssignmentAdapter
@@ -52,6 +52,11 @@ app.include_router(auth_router)
 # ── Setup page ────────────────────────────────────────────────────────────────
 
 _STATIC = Path(__file__).parent / "static"
+
+
+@app.get("/")
+def root() -> RedirectResponse:
+    return RedirectResponse("/setup")
 
 
 @app.get("/setup", response_class=FileResponse)
