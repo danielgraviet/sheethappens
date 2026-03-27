@@ -41,8 +41,9 @@ export function App() {
   const [canvasError, setCanvasError] = useState('');
   const [isSavingCanvas, setIsSavingCanvas] = useState(false);
   const [isEditingCanvas, setIsEditingCanvas] = useState(false);
-  const [tools, setTools] = useState({ gas: 'Loading...', ls: 'javascript:void(0)' });
+  const [tools, setTools] = useState({ gas: 'Loading...', ls: '' });
   const [copyState, setCopyState] = useState('idle');
+  const [lsCopyState, setLsCopyState] = useState('idle');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -106,13 +107,13 @@ export function App() {
 
         setTools({
           gas: gasResult.data.script || '',
-          ls: lsResult.data.js || 'javascript:void(0)',
+          ls: lsResult.data.js || '',
         });
       } catch {
         if (active) {
           setTools({
             gas: 'Unable to load your setup tools right now.',
-            ls: 'javascript:void(0)',
+            ls: '',
           });
         }
       }
@@ -174,6 +175,17 @@ export function App() {
     } catch {
       setCopyState('error');
       window.setTimeout(() => setCopyState('idle'), 2000);
+    }
+  }
+
+  async function copyLs() {
+    try {
+      await navigator.clipboard.writeText(tools.ls);
+      setLsCopyState('copied');
+      window.setTimeout(() => setLsCopyState('idle'), 2000);
+    } catch {
+      setLsCopyState('error');
+      window.setTimeout(() => setLsCopyState('idle'), 2000);
     }
   }
 
@@ -349,12 +361,24 @@ export function App() {
 
               <article className="tool-card">
                 <h3>Learning Suite Sync</h3>
-                <p>Drag this button to your bookmarks bar, then click it from a Learning Suite course page.</p>
-                <a className="bookmarklet" href={tools.ls}>
-                  OhSheet LS
-                </a>
+                <p>Copy this bookmarklet code and save it as a browser bookmark, then click it from a Learning Suite course page.</p>
+                <pre className="code-block">{tools.ls || 'Loading...'}</pre>
+                <div className="actions">
+                  <button className="btn btn-primary" type="button" onClick={copyLs} disabled={!tools.ls}>
+                    {lsCopyState === 'copied'
+                      ? 'Copied'
+                      : lsCopyState === 'error'
+                        ? 'Copy failed'
+                        : 'Copy Bookmarklet'}
+                  </button>
+                </div>
                 <div className="info-panel">
-                  <p>Drag the button into your bookmarks bar, visit a course page, then click it to sync assignments.</p>
+                  <ol>
+                    <li>Click <strong>Copy Bookmarklet</strong> above.</li>
+                    <li>Right-click your bookmarks bar and choose <strong>Add page</strong> or <strong>Add bookmark</strong>.</li>
+                    <li>Set the name to <strong>OhSheet LS</strong> and paste the copied code as the URL.</li>
+                    <li>Visit a Learning Suite course page and click the bookmark to sync.</li>
+                  </ol>
                 </div>
               </article>
             </div>
