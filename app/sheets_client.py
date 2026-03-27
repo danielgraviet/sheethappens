@@ -13,8 +13,8 @@ from app.models import Assignment
 
 OAUTH_SCOPES = [
     "openid",
-    "email",
-    "profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
 ]
@@ -35,13 +35,22 @@ _LAST_SYNCED_CELL = "Sheet1!H1"
 _DUE_DATE_COL_INDEX = 3
 _DAYS_LEFT_COL_INDEX = 4
 
-# Course name → row background color (RGB 0-1 scale)
-_COURSE_COLORS: dict[str, dict] = {
-    "REL":      {"red": 0.85, "green": 0.73, "blue": 0.95},  # lavender
-    "MATH 112": {"red": 0.68, "green": 0.85, "blue": 0.95},  # sky blue
-    "CS 180":   {"red": 0.71, "green": 0.90, "blue": 0.72},  # mint green
-    "CS 270":   {"red": 0.99, "green": 0.88, "blue": 0.68},  # warm amber
-}
+# Palette of pastel colors for dynamic course coloring (RGB 0-1 scale)
+_COLOR_PALETTE = [
+    {"red": 0.68, "green": 0.85, "blue": 0.95},  # sky blue
+    {"red": 0.71, "green": 0.90, "blue": 0.72},  # mint green
+    {"red": 0.99, "green": 0.88, "blue": 0.68},  # warm amber
+    {"red": 0.85, "green": 0.73, "blue": 0.95},  # lavender
+    {"red": 0.99, "green": 0.75, "blue": 0.80},  # rose
+    {"red": 0.68, "green": 0.93, "blue": 0.93},  # aqua
+    {"red": 0.98, "green": 0.93, "blue": 0.68},  # pale yellow
+    {"red": 0.80, "green": 0.90, "blue": 0.78},  # sage
+]
+
+
+def _color_for_course(name: str) -> dict:
+    """Deterministically pick a palette color from the course name."""
+    return _COLOR_PALETTE[hash(name) % len(_COLOR_PALETTE)]
 
 
 class SheetsAuthError(Exception):
@@ -144,6 +153,11 @@ class SheetsClient:
             pass  # non-fatal
 
         logger.info("Appended %d row(s) to spreadsheet %s.", len(rows), self._spreadsheet_id)
+
+        # Ensure every course in this batch has a color rule
+        unique_courses = list({a.course_name for a in assignments})
+        self._update_course_colors(unique_courses)
+
         return len(rows)
 
     def _ensure_headers(self) -> None:
@@ -209,6 +223,17 @@ class SheetsClient:
             ).execute()
 
         self._apply_formatting()
+
+        # Recolor all courses currently in the sheet
+        col_b = self._service.spreadsheets().values().get(
+            spreadsheetId=self._spreadsheet_id,
+            range="Sheet1!B2:B",
+        ).execute()
+        courses = list({
+            row[0] for row in col_b.get("values", [])
+            if row and row[0] and row[0] != "Course"
+        })
+        self._update_course_colors(courses)
 
     def _apply_formatting(self) -> None:
         """
@@ -372,43 +397,6 @@ class SheetsClient:
                 }
             })
 
-        # Course color rules — split range to EXCLUDE col E so urgency colors show through.
-        # Each rule covers A-D (cols 0-4) and F (col 5) as two separate ranges.
-        for i, (course, color) in enumerate(_COURSE_COLORS.items()):
-            course_ranges = [
-                # A through D (Done, Course, Assignment, Due Date)
-                {
-                    "sheetId": sheet_id,
-                    "startRowIndex": 1,
-                    "endRowIndex": 100,
-                    "startColumnIndex": 0,
-                    "endColumnIndex": _DAYS_LEFT_COL_INDEX,
-                },
-                # F (Link) — skips col E (Days Left)
-                {
-                    "sheetId": sheet_id,
-                    "startRowIndex": 1,
-                    "endRowIndex": 100,
-                    "startColumnIndex": _DAYS_LEFT_COL_INDEX + 1,
-                    "endColumnIndex": len(HEADERS),
-                },
-            ]
-            requests.append({
-                "addConditionalFormatRule": {
-                    "rule": {
-                        "ranges": course_ranges,
-                        "booleanRule": {
-                            "condition": {
-                                "type": "CUSTOM_FORMULA",
-                                "values": [{"userEnteredValue": f'=$B2="{course}"'}],
-                            },
-                            "format": {"backgroundColor": color},
-                        },
-                    },
-                    "index": i + 1,
-                }
-            })
-
         # Strikethrough rule — added LAST so it inserts at index 0 = highest priority.
         # Uses =$A2 (truthy check) which reliably matches Sheets boolean checkbox values.
         requests.append({
@@ -442,6 +430,80 @@ class SheetsClient:
         except HttpError as exc:
             # Non-fatal: formatting is cosmetic, log and continue
             logger.warning("Failed to apply sheet formatting: %s", exc)
+
+    def _update_course_colors(self, courses: list[str]) -> None:
+        """Add conditional format rules for any courses not yet colored."""
+        if not courses:
+            return
+
+        sheet_id = self._get_sheet_id()
+
+        # Find courses that already have a color rule
+        result = self._service.spreadsheets().get(
+            spreadsheetId=self._spreadsheet_id,
+            fields="sheets.conditionalFormats,sheets.properties",
+        ).execute()
+
+        existing: set[str] = set()
+        for sheet in result.get("sheets", []):
+            if sheet.get("properties", {}).get("sheetId") == sheet_id:
+                for rule in sheet.get("conditionalFormats", []):
+                    for val in (
+                        rule.get("booleanRule", {})
+                            .get("condition", {})
+                            .get("values", [])
+                    ):
+                        formula = val.get("userEnteredValue", "")
+                        if formula.startswith('=$B2="') and formula.endswith('"'):
+                            existing.add(formula[6:-1])
+
+        new_courses = [c for c in courses if c not in existing]
+        if not new_courses:
+            return
+
+        requests = []
+        for course in new_courses:
+            color = _color_for_course(course)
+            course_ranges = [
+                {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 1,
+                    "endRowIndex": 1000,
+                    "startColumnIndex": 0,
+                    "endColumnIndex": _DAYS_LEFT_COL_INDEX,
+                },
+                {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 1,
+                    "endRowIndex": 1000,
+                    "startColumnIndex": _DAYS_LEFT_COL_INDEX + 1,
+                    "endColumnIndex": len(HEADERS),
+                },
+            ]
+            requests.append({
+                "addConditionalFormatRule": {
+                    "rule": {
+                        "ranges": course_ranges,
+                        "booleanRule": {
+                            "condition": {
+                                "type": "CUSTOM_FORMULA",
+                                "values": [{"userEnteredValue": f'=$B2="{course}"'}],
+                            },
+                            "format": {"backgroundColor": color},
+                        },
+                    },
+                    "index": 999,
+                }
+            })
+
+        try:
+            self._service.spreadsheets().batchUpdate(
+                spreadsheetId=self._spreadsheet_id,
+                body={"requests": requests},
+            ).execute()
+            logger.info("Applied course colors for: %s", new_courses)
+        except HttpError as exc:
+            logger.warning("Failed to apply course colors: %s", exc)
 
     def _to_row(self, assignment: Assignment) -> list[str]:
         """Serialize an Assignment to a Sheets row following COLUMNS order."""
