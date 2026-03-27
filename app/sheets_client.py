@@ -542,6 +542,11 @@ def _build_user_service(access_token: str, refresh_token: str, token_expires_at:
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
 
+    # asyncpg returns naive datetimes; google-auth needs aware datetimes for comparison
+    if token_expires_at is not None and isinstance(token_expires_at, datetime):
+        if token_expires_at.tzinfo is None:
+            token_expires_at = token_expires_at.replace(tzinfo=timezone.utc)
+
     creds = Credentials(
         token=access_token,
         refresh_token=refresh_token,

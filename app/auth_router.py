@@ -344,6 +344,12 @@ async def get_gas_script(ohsheet_session: Annotated[str | None, Cookie()] = None
     sync_url = f"{settings.app_base_url.rstrip('/')}/api/sync/canvas"
     script = f"""// OhSheet — Google Apps Script
 // Install: Extensions → Apps Script → paste this → Save → reload the sheet.
+//
+// When you run the script for the first time Google will show an
+// "app not verified" warning — this is normal for private scripts.
+// Click "Advanced" → "Go to OhSheet (unsafe)" to continue.
+
+// @OnlyCurrentDoc
 
 var SYNC_URL = "{sync_url}";
 var SYNC_TOKEN = "{token}";
